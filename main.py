@@ -1,6 +1,6 @@
 import pandas as pd
-import glob 
 import os
+import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -23,7 +23,9 @@ def formatFlights(df:pd.DataFrame):
 
 def formatAirportCodes(df: pd.DataFrame):
 
-    df = df[(df["iso_country"] == "BR") & (df["type"] != "heliport")]
+    df = df[(df["iso_country"] == "BR") & (df["type"] != "heliport")].copy()
+
+    df.dropna(subset=["icao_code"], inplace=True)
 
     return df
 
@@ -76,11 +78,25 @@ if __name__ == "__main__":
     dfCodes = pd.read_csv(airportCodesPath, sep=",", encoding="utf-8")
     dfCodes = formatAirportCodes(dfCodes)
 
+    dfFlights = pd.merge(dfFlights, dfCodes[["icao_code", "name"]], how="left", left_on="ICAO Aeródromo Origem", right_on="icao_code")
+    # dfFlights.drop(columns="icao_code")
+    dfFlights.rename(columns={"name": "Nome aeroporto origem"})
+
+    dfFlights = pd.merge(dfFlights, dfCodes[["icao_code", "name"]], how="left", left_on="ICAO Aeródromo Destino", right_on="icao_code")
+    # dfFlights.drop(columns="icao_code")
+    dfFlights.rename(columns={"name": "Nome aeroporto destino"})
+
+    # dfFlights = dfFlights.head(1000)
+
+    print(dfFlights)
+
     icaoCode = set(dfCodes["icao_code"])
     dfBrFlights = dfFlights[(dfFlights["ICAO Aeródromo Origem"].isin(icaoCode)) & (dfFlights["ICAO Aeródromo Destino"].isin(icaoCode))]
     
     
     dfBrFlights = dfBrFlights[dfBrFlights["Situação Voo"] == "REALIZADO"]
+
+    # sys.exit()
     
     print("-----------------------------")
     print("Total de voos realizados")
@@ -109,6 +125,7 @@ if __name__ == "__main__":
     
     airportYearly = dfBrFlights.groupby(["Ano", "ICAO Aeródromo Origem"]).size().unstack(fill_value=0)
     variation = airportYearly.diff().sum().sort_values()
+    years = set(dfBrFlights["Ano"])
 
     print("Aeroporto que mais aumentou atrasos:", variation.idxmax(), "(", variation.max(), ")")
     print("Aeroporto que mais diminuiu atrasos:", variation.idxmin(), "(", variation.min(), ")")
@@ -141,7 +158,7 @@ if __name__ == "__main__":
     axes[0].set_title("Aeroportos com mais atrasos", fontsize=14)
     axes[0].set_xlabel("Aeroporto (ICAO)", fontsize=12)
     axes[0].set_ylabel("Quantidade de atrasos", fontsize=12)
-    axes[0].tick_params(axis='x', rotation=0)
+    axes[0].tick_params(axis='x', rotation=45)
     axes[0].grid(axis="y", linestyle="-", alpha=0.7)
     # Exibir os valores acima das barras
     for i, v in enumerate(topDelays.values):
@@ -152,6 +169,7 @@ if __name__ == "__main__":
     axes[1].set_title("Evolução de atrasos por aeroporto")
     axes[1].set_ylabel("Quantidade de atrasos")
     axes[1].set_xlabel("Ano")
+    # axes[1].set_xtick(years)
     axes[1].grid(True, alpha=0.5)
 
     # Gráfico 3: Atrasos por Dia da Semana
@@ -194,4 +212,4 @@ if __name__ == "__main__":
 
     print("Gerando arquivo...")
     # dfBrFlights.to_excel("result.xlsx", index=False, engine="openpyxl")
-    # dfCodes.to_excel('airportCodes.xlsx', index=False, engine="openpyxl")    
+        
